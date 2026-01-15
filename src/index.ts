@@ -192,6 +192,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: 'rize_get_sessions',
+        description: 'Get work sessions for a date range. Shows focus, break, and meeting sessions with associated projects/tasks.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            startDate: {
+              type: 'string',
+              description: 'Start date in YYYY-MM-DD format',
+            },
+            endDate: {
+              type: 'string',
+              description: 'End date in YYYY-MM-DD format',
+            },
+          },
+          required: ['startDate', 'endDate'],
+        },
+      },
+      {
         name: 'rize_create_task_time_entry',
         description: 'Log time to a task. Creates a time entry for the specified task.',
         inputSchema: {
@@ -414,6 +432,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'rize_get_current_session': {
         const result = await rize.getCurrentSession();
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_get_sessions': {
+        const { startDate, endDate } = args as { startDate: string; endDate: string };
+        const result = await rize.getSessions(startDate, endDate);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }
 

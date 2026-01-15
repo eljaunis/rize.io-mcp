@@ -143,6 +143,33 @@ export class RizeClient {
     return this.client.request(query);
   }
 
+  async getSessions(startDate: string, endDate: string) {
+    const query = `
+      query Sessions($startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!) {
+        sessions(startTime: $startTime, endTime: $endTime) {
+          id
+          title
+          description
+          startTime
+          endTime
+          type
+          source
+          projects {
+            id
+            name
+          }
+          tasks {
+            id
+            name
+          }
+        }
+      }
+    `;
+    const startTime = `${startDate}T00:00:00Z`;
+    const endTime = `${endDate}T23:59:59Z`;
+    return this.client.request(query, { startTime, endTime });
+  }
+
   // ============ MUTATIONS ============
 
   async createProject(name: string, clientName?: string, teamName?: string) {

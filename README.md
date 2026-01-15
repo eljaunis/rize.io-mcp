@@ -24,6 +24,7 @@ MCP (Model Context Protocol) server for [Rize.io](https://rize.io) time tracking
 | `rize_get_time_entries` | Get time entries for a date range |
 | `rize_get_summaries` | Get time summaries (focus, meeting, break time) |
 | `rize_get_current_session` | Get the current active session |
+| `rize_get_sessions` | Get all sessions for a date range |
 
 ### Create Operations
 | Tool | Description |
