@@ -22,15 +22,32 @@ MCP (Model Context Protocol) server for [Rize.io](https://rize.io) time tracking
 | `rize_list_projects` | List all projects (with client info) |
 | `rize_list_tasks` | List all tasks (with project info) |
 | `rize_get_time_entries` | Get time entries for a date range |
+| `rize_get_summaries` | Get time summaries (focus, meeting, break time) |
+| `rize_get_current_session` | Get the current active session |
 
-### Write Operations
+### Create Operations
 | Tool | Description |
 |------|-------------|
 | `rize_create_client` | Create a new client |
 | `rize_create_project` | Create a new project (optionally linked to client) |
 | `rize_create_task` | Create a new task (optionally linked to project) |
+| `rize_create_task_time_entry` | Log time to a task |
 
-**Note:** Write operations require a `teamName` parameter to specify which team to create the entity under.
+### Update Operations
+| Tool | Description |
+|------|-------------|
+| `rize_update_client` | Update client (rename, set status) |
+| `rize_update_project` | Update project (rename, change client, set status) |
+| `rize_update_task` | Update task (rename, change project, set status) |
+
+### Delete Operations
+| Tool | Description |
+|------|-------------|
+| `rize_delete_client` | Delete a client by ID |
+| `rize_delete_project` | Delete a project by ID |
+| `rize_delete_task` | Delete a task by ID |
+
+**Note:** Create/update operations require a `teamName` parameter to specify which team to operate under.
 
 ## MCP Configuration
 

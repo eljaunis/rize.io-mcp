@@ -160,6 +160,195 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+      {
+        name: 'rize_get_summaries',
+        description: 'Get time summaries (focus time, meeting time, break time) for a date range',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            startDate: {
+              type: 'string',
+              description: 'Start date in YYYY-MM-DD format',
+            },
+            endDate: {
+              type: 'string',
+              description: 'End date in YYYY-MM-DD format',
+            },
+            bucketSize: {
+              type: 'string',
+              description: 'Bucket size: day, week, or month (default: day)',
+              enum: ['day', 'week', 'month'],
+            },
+          },
+          required: ['startDate', 'endDate'],
+        },
+      },
+      {
+        name: 'rize_get_current_session',
+        description: 'Get the current active session being tracked',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'rize_create_task_time_entry',
+        description: 'Log time to a task. Creates a time entry for the specified task.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            taskId: {
+              type: 'string',
+              description: 'ID of the task to log time to',
+            },
+            startTime: {
+              type: 'string',
+              description: 'Start time in ISO8601 format (e.g., 2026-01-15T09:00:00Z)',
+            },
+            endTime: {
+              type: 'string',
+              description: 'End time in ISO8601 format (e.g., 2026-01-15T10:30:00Z)',
+            },
+            description: {
+              type: 'string',
+              description: 'Optional description of the work done',
+            },
+            billable: {
+              type: 'boolean',
+              description: 'Whether this time entry is billable (default: false)',
+            },
+          },
+          required: ['taskId', 'startTime', 'endTime'],
+        },
+      },
+      {
+        name: 'rize_update_task',
+        description: 'Update an existing task (rename, change project, set status)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'ID of the task to update',
+            },
+            name: {
+              type: 'string',
+              description: 'New name for the task',
+            },
+            projectName: {
+              type: 'string',
+              description: 'Project name to move the task to',
+            },
+            status: {
+              type: 'string',
+              description: 'Status of the task (active, archived)',
+            },
+            teamName: {
+              type: 'string',
+              description: 'Team name',
+            },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'rize_update_project',
+        description: 'Update an existing project (rename, change client, set status)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'ID of the project to update',
+            },
+            name: {
+              type: 'string',
+              description: 'New name for the project',
+            },
+            clientName: {
+              type: 'string',
+              description: 'Client name to associate with the project',
+            },
+            status: {
+              type: 'string',
+              description: 'Status of the project (active, archived)',
+            },
+            teamName: {
+              type: 'string',
+              description: 'Team name',
+            },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'rize_update_client',
+        description: 'Update an existing client (rename, set status)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'ID of the client to update',
+            },
+            name: {
+              type: 'string',
+              description: 'New name for the client',
+            },
+            status: {
+              type: 'string',
+              description: 'Status of the client (active, archived)',
+            },
+            teamName: {
+              type: 'string',
+              description: 'Team name',
+            },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'rize_delete_task',
+        description: 'Delete a task by ID',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'ID of the task to delete',
+            },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'rize_delete_project',
+        description: 'Delete a project by ID',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'ID of the project to delete',
+            },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'rize_delete_client',
+        description: 'Delete a client by ID',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'ID of the client to delete',
+            },
+          },
+          required: ['id'],
+        },
+      },
     ],
   };
 });
@@ -214,6 +403,59 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'rize_get_current_user': {
         const result = await rize.getCurrentUser();
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_get_summaries': {
+        const { startDate, endDate, bucketSize } = args as { startDate: string; endDate: string; bucketSize?: string };
+        const result = await rize.getSummaries(startDate, endDate, bucketSize || 'day');
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_get_current_session': {
+        const result = await rize.getCurrentSession();
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_create_task_time_entry': {
+        const { taskId, startTime, endTime, description, billable } = args as { taskId: string; startTime: string; endTime: string; description?: string; billable?: boolean };
+        const result = await rize.createTaskTimeEntry(taskId, startTime, endTime, description, billable);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_update_task': {
+        const { id, name: taskName, projectName, status, teamName } = args as { id: string; name?: string; projectName?: string; status?: string; teamName?: string };
+        const result = await rize.updateTask(id, taskName, projectName, status, teamName);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_update_project': {
+        const { id, name: projName, clientName, status, teamName } = args as { id: string; name?: string; clientName?: string; status?: string; teamName?: string };
+        const result = await rize.updateProject(id, projName, clientName, status, teamName);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_update_client': {
+        const { id, name: clientName, status, teamName } = args as { id: string; name?: string; status?: string; teamName?: string };
+        const result = await rize.updateClient(id, clientName, status, teamName);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_delete_task': {
+        const { id } = args as { id: string };
+        const result = await rize.deleteTask(id);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_delete_project': {
+        const { id } = args as { id: string };
+        const result = await rize.deleteProject(id);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case 'rize_delete_client': {
+        const { id } = args as { id: string };
+        const result = await rize.deleteClient(id);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }
 
