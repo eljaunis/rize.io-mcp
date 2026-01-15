@@ -50,6 +50,14 @@ MCP (Model Context Protocol) server for [Rize.io](https://rize.io) time tracking
 
 **Note:** Create/update operations require a `teamName` parameter to specify which team to operate under.
 
+## AI Agent Skill
+
+This repo includes a Claude-compatible Agent Skill for AI assistants. The skill teaches agents how to effectively use the Rize MCP for time tracking workflows.
+
+**Location:** `skills/tracking-time-with-rize/`
+
+To use with Claude or other compatible AI agents, copy the skill directory to your agent's skills folder.
+
 ## MCP Configuration
 
 ### Windsurf
