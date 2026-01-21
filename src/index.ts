@@ -396,7 +396,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'rize_get_time_entries': {
-        const { startDate, endDate } = args as { startDate: string; endDate: string };
+        const startDate = args?.startDate as string;
+        const endDate = args?.endDate as string;
+        if (!startDate || !endDate) {
+          throw new Error(`Missing required parameters. Got startDate=${startDate}, endDate=${endDate}. Args received: ${JSON.stringify(args)}`);
+        }
         const result = await rize.getTimeEntries(startDate, endDate);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }
@@ -425,8 +429,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'rize_get_summaries': {
-        const { startDate, endDate, bucketSize } = args as { startDate: string; endDate: string; bucketSize?: string };
-        const result = await rize.getSummaries(startDate, endDate, bucketSize || 'day');
+        const startDate = args?.startDate as string;
+        const endDate = args?.endDate as string;
+        const bucketSize = (args?.bucketSize as string) || 'day';
+        if (!startDate || !endDate) {
+          throw new Error(`Missing required parameters. Got startDate=${startDate}, endDate=${endDate}. Args received: ${JSON.stringify(args)}`);
+        }
+        const result = await rize.getSummaries(startDate, endDate, bucketSize);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }
 
@@ -436,7 +445,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'rize_get_sessions': {
-        const { startDate, endDate } = args as { startDate: string; endDate: string };
+        const startDate = args?.startDate as string;
+        const endDate = args?.endDate as string;
+        if (!startDate || !endDate) {
+          throw new Error(`Missing required parameters. Got startDate=${startDate}, endDate=${endDate}. Args received: ${JSON.stringify(args)}`);
+        }
         const result = await rize.getSessions(startDate, endDate);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }
