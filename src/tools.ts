@@ -10,6 +10,7 @@ import {
   sortByStartTimeDescending,
 } from './analysis.js';
 import { AppError } from './errors.js';
+import { answerQuestion } from './question-answer.js';
 import { RizeClient } from './rize-client.js';
 import { toFailureResult, toSuccessResult } from './response.js';
 import {
@@ -17,6 +18,7 @@ import {
   clientListInputSchema,
   emptyInputSchema,
   projectListInputSchema,
+  questionAnswerInputSchema,
   sessionsInputSchema,
   summariesInputSchema,
   taskListInputSchema,
@@ -67,6 +69,13 @@ export function createRizeMcpServer(env: CloudflareEnv, client: RizeClient): Mcp
 
 export function getToolDefinitions(): ToolDefinition[] {
   return [
+    {
+      name: 'rize_question_answer_get',
+      description:
+        'Answer a natural-language question about tracked hours, allocation, trends, and time analytics for the selected period.',
+      inputSchema: questionAnswerInputSchema,
+      execute: async (args, { client }) => answerQuestion(args, client),
+    },
     {
       name: 'rize_user_get',
       description: 'Get the currently authenticated Rize user for this shared team workspace.',
@@ -199,7 +208,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     {
       name: 'rize_analysis_context_get',
       description:
-        'Fetch structured Rize context for Claude to analyze a team productivity question over a date range.',
+        'Fetch advanced raw analysis context for Claude when drill-down data is needed beyond the question-answer tool.',
       inputSchema: analysisInputSchema,
       execute: async (args, { client }) => {
         const [currentSession, summaries, timeEntries, sessions, projects] = await Promise.all([

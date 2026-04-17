@@ -50,6 +50,7 @@ describe('remote MCP integration', () => {
     const toolList = await client.listTools();
 
     expect(toolList.tools.map((tool) => tool.name)).toEqual([
+      'rize_question_answer_get',
       'rize_user_get',
       'rize_clients_list',
       'rize_projects_list',
@@ -60,6 +61,54 @@ describe('remote MCP integration', () => {
       'rize_sessions_list',
       'rize_analysis_context_get',
     ]);
+
+    await client.close();
+  });
+
+  it('returns structured answer data for report questions', async () => {
+    const { close, url } = await startTestServer(TEST_ENV, {
+      fetchFn: createMockRizeFetch(),
+    });
+    openServers.push(close);
+
+    const transport = new StreamableHTTPClientTransport(url, {
+      requestInit: {
+        headers: {
+          authorization: `Bearer ${TEST_ENV.MCP_SHARED_API_KEY}`,
+        },
+      },
+    });
+    const client = new Client({ name: 'test-client', version: '1.0.0' });
+
+    await client.connect(transport);
+    const result = await client.callTool({
+      arguments: {
+        endDate: '2026-04-15',
+        question: 'How many hours did we spend by client last week?',
+        startDate: '2026-04-14',
+      },
+      name: 'rize_question_answer_get',
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      data: {
+        breakdowns: [
+          {
+            dimension: 'client',
+          },
+        ],
+        interpretedRequest: {
+          defaultedHoursToTrackedTime: true,
+          grouping: 'client',
+          metric: 'trackedTimeSeconds',
+        },
+        metrics: {
+          trackedTimeSeconds: 10800,
+        },
+      },
+      ok: true,
+    });
 
     await client.close();
   });

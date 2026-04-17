@@ -23,12 +23,12 @@ Example response:
 }
 ```
 
-## Ask Claude For Team Analysis
+## Ask Claude A Report Question
 
 ```text
-Tool: rize:rize_analysis_context_get
+Tool: rize:rize_question_answer_get
 Args: {
-  "prompt": "Analyze focus trends and client allocation for the first half of April",
+  "question": "How many hours did we spend by client in the first half of April?",
   "startDate": "2026-04-01",
   "endDate": "2026-04-15"
 }
@@ -40,39 +40,22 @@ Example response shape:
 {
   "ok": true,
   "data": {
-    "normalizedScope": {
-      "bucketSize": "day",
-      "dateRange": {
-        "startDate": "2026-04-01",
-        "endDate": "2026-04-15"
-      },
-      "inferredTopics": ["focus", "clients", "trends"]
+    "interpretedRequest": {
+      "metric": "trackedTimeSeconds",
+      "grouping": "client",
+      "intent": "allocation"
     },
-    "summaries": {
-      "count": 1,
-      "bucketSize": "day",
-      "buckets": []
+    "metrics": {
+      "trackedTimeSeconds": 10800,
+      "workHoursSeconds": 12600,
+      "focusTimeSeconds": 5400,
+      "meetingTimeSeconds": 1800,
+      "breakTimeSeconds": 600,
+      "sessionCount": 2
     },
-    "timeEntries": {
-      "count": 2,
-      "aggregates": {
-        "totalTrackedSeconds": 10800,
-        "byClient": [],
-        "byProject": [],
-        "byTask": [],
-        "byDay": []
-      },
-      "items": []
-    },
-    "sessions": {
-      "count": 2,
-      "aggregates": {
-        "countByType": [],
-        "durationByType": [],
-        "totalSessionCount": 2
-      },
-      "items": []
-    },
+    "breakdowns": [],
+    "comparisons": null,
+    "evidence": {},
     "warnings": []
   }
 }
@@ -88,12 +71,34 @@ Args: { "limit": 20 }
 Find the client ID, then:
 
 ```text
-Tool: rize:rize_analysis_context_get
+Tool: rize:rize_question_answer_get
 Args: {
-  "prompt": "Summarize how much time the team spent on Acme Corp and whether the work was meeting-heavy",
+  "question": "Summarize how much time the team spent on Acme Corp and whether the work was meeting-heavy",
   "startDate": "2026-04-01",
   "endDate": "2026-04-15",
   "clientIds": ["client-1"]
+}
+```
+
+## Compare Metrics
+
+```text
+Tool: rize:rize_question_answer_get
+Args: {
+  "question": "How did focus time compare to meeting time this week?",
+  "startDate": "2026-04-14",
+  "endDate": "2026-04-15"
+}
+```
+
+## Compare Previous Period
+
+```text
+Tool: rize:rize_question_answer_get
+Args: {
+  "question": "What changed week over week?",
+  "startDate": "2026-04-14",
+  "endDate": "2026-04-15"
 }
 ```
 

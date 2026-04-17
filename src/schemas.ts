@@ -111,3 +111,29 @@ export const analysisInputSchema = z
     taskIds: idArray.describe('Optional task IDs to include'),
   })
   .superRefine(validateDateRange);
+
+export const questionAnswerInputSchema = z
+  .object({
+    clientIds: idArray.describe('Optional client IDs to include'),
+    endDate: dateField,
+    grain: z
+      .enum(['day', 'week', 'month'])
+      .optional()
+      .describe('Optional reporting grain hint'),
+    projectIds: idArray.describe('Optional project IDs to include'),
+    question: z
+      .string()
+      .min(8)
+      .max(2000)
+      .describe('Natural-language reporting or time question'),
+    startDate: dateField,
+    taskIds: idArray.describe('Optional task IDs to include'),
+    topN: z
+      .number()
+      .int()
+      .min(1)
+      .max(25)
+      .optional()
+      .describe('Optional top-N hint for ranked questions'),
+  })
+  .superRefine(validateDateRange);

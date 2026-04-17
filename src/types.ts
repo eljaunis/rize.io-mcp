@@ -141,3 +141,80 @@ export interface AppDependencies {
   fetchFn?: typeof fetch;
   now?: () => Date;
 }
+
+export type ReportMetric =
+  | 'trackedTimeSeconds'
+  | 'workHoursSeconds'
+  | 'focusTimeSeconds'
+  | 'meetingTimeSeconds'
+  | 'breakTimeSeconds'
+  | 'sessionCount';
+
+export type ReportGrouping = 'client' | 'project' | 'task' | 'day' | 'week' | 'none';
+
+export type ReportIntent =
+  | 'total'
+  | 'allocation'
+  | 'top'
+  | 'trend'
+  | 'comparison'
+  | 'mix';
+
+export type ComparisonMode = 'metric_vs_metric' | 'previous_period' | 'none';
+
+export interface MetricValue {
+  label: string;
+  value: number;
+}
+
+export interface BreakdownItem {
+  id: string | null;
+  label: string;
+  percentageOfTotal?: number;
+  value: number;
+}
+
+export interface BreakdownSection {
+  dimension: ReportGrouping;
+  items: BreakdownItem[];
+  metric: ReportMetric;
+}
+
+export interface EvidenceSection {
+  sessions?: SessionRecord[];
+  summaryBuckets?: SummaryBucket[];
+  timeEntries?: TimeEntryRecord[];
+}
+
+export interface ComparisonSection {
+  kind: ComparisonMode;
+  currentPeriod?: Record<string, number>;
+  delta?: Record<string, number>;
+  previousPeriod?: Record<string, number>;
+}
+
+export interface InterpretedRequest {
+  comparisonMode: ComparisonMode;
+  defaultedHoursToTrackedTime: boolean;
+  filters: {
+    clientIds: string[];
+    projectIds: string[];
+    taskIds: string[];
+  };
+  grain: 'day' | 'month' | 'none' | 'week';
+  grouping: ReportGrouping;
+  intent: ReportIntent;
+  metric: ReportMetric;
+  question: string;
+}
+
+export interface QuestionAnswerResponse {
+  breakdowns: BreakdownSection[];
+  comparisons: ComparisonSection | null;
+  evidence: EvidenceSection;
+  interpretedRequest: InterpretedRequest;
+  metricDefinitions: Record<ReportMetric, string>;
+  metrics: Record<ReportMetric, number>;
+  question: string;
+  warnings: string[];
+}
