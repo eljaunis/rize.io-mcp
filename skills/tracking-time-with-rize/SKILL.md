@@ -1,144 +1,95 @@
 ---
 name: tracking-time-with-rize
-description: Track time, manage clients/projects/tasks, and analyze productivity using Rize.io via MCP. Use when the user mentions time tracking, logging work hours, productivity analysis, focus time, or managing Rize entities (clients, projects, tasks).
+description: Analyze team time tracking and productivity in Rize through a read-only hosted MCP. Use when the user wants Claude to inspect focus time, meetings, client allocation, project effort, or work-pattern trends.
 ---
 
-# Rize Time Tracking Skill
+# Rize Team Analytics Skill
 
-This skill enables AI agents to interact with Rize.io for time tracking and productivity management through the Rize MCP server.
+This skill teaches an agent how to use the hosted Rize MCP as a read-only analytics source for team workflows.
 
-## When to Use This Skill
+## When To Use This Skill
 
-- User asks about time tracking or logging hours
-- User wants to create/update/delete clients, projects, or tasks
-- User asks about productivity, focus time, or work summaries
-- User mentions Rize explicitly
-- User wants to analyze how time was spent
+- The user asks Claude to analyze Rize time data
+- The user wants a team-level summary for a date range
+- The user asks about client allocation, project effort, task effort, focus time, or meetings
+- The user mentions Rize explicitly and wants insights, not data mutation
 
-## MCP Server Reference
+## Server Reference
 
-Server name: `rize` (may vary based on user configuration)
+Server name: `rize`
+
+This skill assumes a hosted remote MCP endpoint, not a local stdio server.
 
 ## Available Tools
 
-### Reading Data
+| Tool | Purpose |
+|------|---------|
+| `rize:rize_user_get` | Verify the authenticated Rize identity |
+| `rize:rize_clients_list` | List clients |
+| `rize:rize_projects_list` | List projects, optionally narrowed by client |
+| `rize:rize_tasks_list` | List tasks, optionally narrowed by project |
+| `rize:rize_time_entries_list` | Get approved task time entries for a date range |
+| `rize:rize_summaries_get` | Get workspace-level summary buckets |
+| `rize:rize_sessions_current_get` | Check the currently active session |
+| `rize:rize_sessions_list` | Get focus, meeting, and break sessions for a date range |
+| `rize:rize_analysis_context_get` | Fetch structured context for Claude to analyze |
 
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| `rize:rize_get_current_user` | Get authenticated user info | Verify connection, get user details |
-| `rize:rize_list_clients` | List all clients | Before creating entities, to check existing |
-| `rize:rize_list_projects` | List all projects | Find project IDs, check what exists |
-| `rize:rize_list_tasks` | List all tasks | Find task IDs for time logging |
-| `rize:rize_get_time_entries` | Get time entries for date range | Review logged time, calculate totals |
-| `rize:rize_get_summaries` | Get focus/meeting/break time | Productivity analysis, capacity checks |
-| `rize:rize_get_current_session` | Get active tracking session | Check what's currently being tracked |
-| `rize:rize_get_sessions` | Get all sessions for date range | Detailed work pattern analysis |
+## Preferred Workflow
 
-### Creating Entities
+### Default Path
 
-| Tool | Purpose | Required Params |
-|------|---------|-----------------|
-| `rize:rize_create_client` | Create new client | `name`, `teamName` |
-| `rize:rize_create_project` | Create new project | `name`, optional `clientName`, `teamName` |
-| `rize:rize_create_task` | Create new task | `name`, optional `projectName`, `teamName` |
-| `rize:rize_create_task_time_entry` | Log time to task | `taskId`, `startTime`, `endTime` |
+Use `rize:rize_analysis_context_get` first when the user asks an open-ended question.
 
-### Updating Entities
+Provide:
 
-| Tool | Purpose | Required Params |
-|------|---------|-----------------|
-| `rize:rize_update_client` | Update client | `id`, optional `name`, `status` |
-| `rize:rize_update_project` | Update project | `id`, optional `name`, `clientName`, `status` |
-| `rize:rize_update_task` | Update task | `id`, optional `name`, `projectName`, `status` |
+- `prompt`
+- `startDate`
+- `endDate`
+- optional `clientIds`, `projectIds`, or `taskIds`
 
-### Deleting Entities
+Then let Claude do the interpretation in-chat.
 
-| Tool | Purpose | Required Params |
-|------|---------|-----------------|
-| `rize:rize_delete_client` | Delete client | `id` |
-| `rize:rize_delete_project` | Delete project | `id` |
-| `rize:rize_delete_task` | Delete task | `id` |
+### Drill-Down Path
 
-## Entity Hierarchy
+If Claude needs to inspect specific entities before asking the analysis tool:
 
-```
-Team
-  └── Client (business relationship)
-        └── Project (work stream)
-              └── Task (trackable unit of work)
-```
+1. Use `rize:rize_clients_list`
+2. Use `rize:rize_projects_list` or `rize:rize_tasks_list`
+3. Re-run `rize:rize_analysis_context_get` with IDs
 
-## Common Workflows
+### Manual Inspection Path
 
-### Check Existing Before Creating
+Use the lower-level read tools only when the user wants raw data or when Claude needs to validate a hypothesis:
 
-Always check if an entity exists before creating:
+1. `rize:rize_summaries_get` for workspace totals
+2. `rize:rize_time_entries_list` for tracked task time
+3. `rize:rize_sessions_list` for focus/meeting/break patterns
 
-```
-1. Use rize:rize_list_clients to check existing clients
-2. Use rize:rize_list_projects to check existing projects
-3. Only create if the entity doesn't exist
-```
+## Important Behavior Notes
 
-### Log Time to a Task
+- This MCP is read-only. Do not attempt create, update, delete, or time-entry logging workflows.
+- Summary buckets are workspace-level totals from Rize. If filters are applied in `rize_analysis_context_get`, the summaries remain team-wide and the tool will warn about that.
+- Approved task time entries are returned from Rize. Pending suggestions are not.
+- Durations are returned in seconds.
+- Dates use `YYYY-MM-DD`.
 
-```
-1. Use rize:rize_list_tasks to find the task ID
-2. Use rize:rize_create_task_time_entry with:
-   - taskId: the task's ID
-   - startTime: ISO8601 format (e.g., "2026-01-15T09:00:00Z")
-   - endTime: ISO8601 format (e.g., "2026-01-15T10:30:00Z")
-   - description: optional work description
-   - billable: optional boolean
-```
+## How Claude Should Use The Analysis Tool
 
-### Analyze Productivity
+When you call `rize:rize_analysis_context_get`, expect:
 
-```
-1. Use rize:rize_get_summaries with date range and bucketSize (day/week/month)
-2. Returns: focusTime, meetingTime, breakTime, trackedTime, workHours (in seconds)
-3. Convert seconds to hours: divide by 3600
-```
+- `normalizedScope`
+- `summaries`
+- `timeEntries`
+- `sessions`
+- `warnings`
 
-### Get Time Breakdown by Client
+Claude should:
 
-```
-1. Use rize:rize_get_time_entries with date range
-2. Group entries by task.project.client.name
-3. Sum durations (in seconds) per client
-```
+1. Use `warnings` to qualify the answer
+2. Use aggregates first for the answer structure
+3. Use raw items only for supporting evidence
+4. Avoid claiming data the tool warns is unavailable
 
-## Important Notes
+## Examples
 
-### Team Name Parameter
-
-Most create/update operations require `teamName`. This is the Rize team the user belongs to. If unknown, use `rize:rize_list_clients` first - the team name appears in the response.
-
-### Time Formats
-
-- Dates: `YYYY-MM-DD` (e.g., "2026-01-15")
-- DateTimes: ISO8601 (e.g., "2026-01-15T09:00:00Z")
-- Durations in responses: seconds (divide by 3600 for hours)
-
-### Approved vs Pending Entries
-
-The API only returns **approved** time entries. Suggested/pending entries from Rize's auto-tracking must be approved in the Rize app before they appear via API.
-
-### Status Values
-
-For update operations, valid status values are typically:
-- `active` - Entity is in use
-- `archived` - Entity is hidden but preserved
-
-## Error Handling
-
-If a tool returns an error:
-1. Check that required parameters are provided
-2. Verify IDs exist using list tools
-3. Ensure teamName is correct for create operations
-4. Check date formats are valid
-
-## Reference Files
-
-For detailed examples and advanced patterns, see:
-- [examples.md](./examples.md) - Common usage patterns with sample responses
+See [examples.md](./examples.md) for prompt patterns and sample tool calls.

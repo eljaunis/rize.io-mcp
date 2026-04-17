@@ -1,21 +1,25 @@
 {
   "name": "rize-mcp",
   "version": "0.1.0",
-  "description": "Minimal MCP server for Rize.io time tracking",
+  "description": "Read-only team analytics MCP for Rize.io on Cloudflare Workers",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "src/index.ts",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "build": "tsc --noEmit",
+    "check": "npm run build && npm run test",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "graphql-request": "^7.0.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260410.0",
     "@types/node": "^20.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4",
+    "wrangler": "^4.83.0"
   }
 }

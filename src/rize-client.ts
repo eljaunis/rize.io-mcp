@@ -1,101 +1,117 @@
-import { GraphQLClient } from 'graphql-request';
+import { AppError } from './errors.js';
+import type {
+  ClientRecord,
+  CurrentUser,
+  ProjectRecord,
+  SessionRecord,
+  SummaryBucket,
+  TaskRecord,
+  TimeEntryRecord,
+} from './types.js';
 
 const RIZE_API_URL = 'https://api.rize.io/api/v1/graphql';
 
+interface GraphQLError {
+  message: string;
+}
+
+interface GraphQLResponse<TData> {
+  data?: TData;
+  errors?: GraphQLError[];
+}
+
+interface RizeClientOptions {
+  apiKey: string;
+  fetchFn?: typeof fetch;
+}
+
 export class RizeClient {
-  private client: GraphQLClient;
+  private readonly apiKey: string;
+  private readonly fetchFn: typeof fetch;
 
-  constructor(apiKey: string) {
-    this.client = new GraphQLClient(RIZE_API_URL, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
+  constructor(options: RizeClientOptions) {
+    this.apiKey = options.apiKey;
+    this.fetchFn = options.fetchFn ?? fetch;
   }
 
-  // ============ QUERIES ============
-
-  async getCurrentUser() {
-    const query = `
-      query CurrentUser {
-        currentUser {
-          email
-          name
-        }
-      }
-    `;
-    return this.client.request(query);
-  }
-
-  async listProjects(first = 50) {
-    const query = `
-      query ListProjects($first: Int) {
-        projects(first: $first) {
-          nodes {
-            id
+  async getCurrentUser(): Promise<CurrentUser> {
+    const data = await this.request<{ currentUser: CurrentUser }>(
+      `
+        query CurrentUser {
+          currentUser {
+            email
             name
-            color
-            client {
+          }
+        }
+      `
+    );
+
+    return data.currentUser;
+  }
+
+  async listClients(first = 50): Promise<ClientRecord[]> {
+    const data = await this.request<{
+      clients: {
+        nodes: Array<{
+          id: string;
+          name: string;
+          team?: {
+            id: string;
+            name: string;
+          } | null;
+        }>;
+      };
+    }>(
+      `
+        query ListClients($first: Int) {
+          clients(first: $first) {
+            nodes {
               id
               name
+              team {
+                id
+                name
+              }
             }
           }
         }
-      }
-    `;
-    return this.client.request(query, { first });
-  }
+      `,
+      { first }
+    );
 
-  async listClients(first = 50) {
-    const query = `
-      query ListClients($first: Int) {
-        clients(first: $first) {
-          nodes {
-            id
-            name
-            team {
-              id
-              name
-            }
+    return data.clients.nodes.map((client) => ({
+      id: client.id,
+      name: client.name,
+      team: client.team
+        ? {
+            id: client.team.id,
+            name: client.team.name,
           }
-        }
-      }
-    `;
-    return this.client.request(query, { first });
+        : undefined,
+    }));
   }
 
-  async listTasks(first = 50) {
-    const query = `
-      query ListTasks($first: Int) {
-        tasks(first: $first) {
-          nodes {
-            id
-            name
-            project {
+  async listProjects(first = 50): Promise<ProjectRecord[]> {
+    const data = await this.request<{
+      projects: {
+        nodes: Array<{
+          color?: string | null;
+          client?: {
+            id: string;
+            name: string;
+          } | null;
+          id: string;
+          name: string;
+        }>;
+      };
+    }>(
+      `
+        query ListProjects($first: Int) {
+          projects(first: $first) {
+            nodes {
               id
               name
-            }
-          }
-        }
-      }
-    `;
-    return this.client.request(query, { first });
-  }
-
-  async getTimeEntries(startDate: string, endDate: string) {
-    const query = `
-      query TaskTimeEntries($startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!) {
-        taskTimeEntries(startTime: $startTime, endTime: $endTime) {
-          id
-          duration
-          startTime
-          endTime
-          task {
-            id
-            name
-            project {
-              id
-              name
+              color
               client {
                 id
                 name
@@ -103,130 +119,107 @@ export class RizeClient {
             }
           }
         }
-      }
-    `;
-    // Convert dates to datetime format
-    const startTime = `${startDate}T00:00:00Z`;
-    const endTime = `${endDate}T23:59:59Z`;
-    return this.client.request(query, { startTime, endTime });
-  }
+      `,
+      { first }
+    );
 
-  async getSummaries(startDate: string, endDate: string, bucketSize: string = 'day') {
-    const query = `
-      query Summaries($startDate: ISO8601Date!, $endDate: ISO8601Date!, $bucketSize: String!) {
-        summaries(startDate: $startDate, endDate: $endDate, bucketSize: $bucketSize) {
-          startTime
-          endTime
-          focusTime
-          meetingTime
-          breakTime
-          trackedTime
-          workHours
-        }
-      }
-    `;
-    return this.client.request(query, { startDate, endDate, bucketSize });
-  }
-
-  async getCurrentSession() {
-    const query = `
-      query CurrentSession {
-        currentSession {
-          id
-          title
-          startTime
-          endTime
-          type
-        }
-      }
-    `;
-    return this.client.request(query);
-  }
-
-  async getSessions(startDate: string, endDate: string) {
-    const query = `
-      query Sessions($startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!) {
-        sessions(startTime: $startTime, endTime: $endTime) {
-          id
-          title
-          description
-          startTime
-          endTime
-          type
-          source
-          projects {
-            id
-            name
+    return data.projects.nodes.map((project) => ({
+      id: project.id,
+      name: project.name,
+      color: project.color ?? null,
+      client: project.client
+        ? {
+            id: project.client.id,
+            name: project.client.name,
           }
-          tasks {
-            id
-            name
-          }
-        }
-      }
-    `;
-    const startTime = `${startDate}T00:00:00Z`;
-    const endTime = `${endDate}T23:59:59Z`;
-    return this.client.request(query, { startTime, endTime });
+        : undefined,
+    }));
   }
 
-  // ============ MUTATIONS ============
-
-  async createProject(name: string, clientName?: string, teamName?: string) {
-    const mutation = `
-      mutation CreateProject($name: String!, $clientName: String, $teamName: String) {
-        createProject(input: { args: { name: $name, clientName: $clientName, teamName: $teamName } }) {
-          project {
-            id
-            name
-            client {
+  async listTasks(first = 50): Promise<TaskRecord[]> {
+    const data = await this.request<{
+      tasks: {
+        nodes: Array<{
+          id: string;
+          name: string;
+          project?: {
+            client?: {
+              id: string;
+              name: string;
+            } | null;
+            color?: string | null;
+            id: string;
+            name: string;
+          } | null;
+        }>;
+      };
+    }>(
+      `
+        query ListTasks($first: Int) {
+          tasks(first: $first) {
+            nodes {
               id
               name
+              project {
+                id
+                name
+                color
+                client {
+                  id
+                  name
+                }
+              }
             }
           }
         }
-      }
-    `;
-    return this.client.request(mutation, { name, clientName, teamName });
-  }
+      `,
+      { first }
+    );
 
-  async createClient(name: string, teamName?: string) {
-    const mutation = `
-      mutation CreateClient($name: String!, $teamName: String) {
-        createClient(input: { args: { name: $name, teamName: $teamName } }) {
-          client {
-            id
-            name
+    return data.tasks.nodes.map((task) => ({
+      id: task.id,
+      name: task.name,
+      project: task.project
+        ? {
+            id: task.project.id,
+            name: task.project.name,
+            color: task.project.color ?? null,
+            client: task.project.client
+              ? {
+                  id: task.project.client.id,
+                  name: task.project.client.name,
+                }
+              : undefined,
           }
-        }
-      }
-    `;
-    return this.client.request(mutation, { name, teamName });
+        : undefined,
+    }));
   }
 
-  async createTask(name: string, projectName?: string, teamName?: string) {
-    const mutation = `
-      mutation CreateTask($name: String!, $projectName: String, $teamName: String) {
-        createTask(input: { args: { name: $name, projectName: $projectName, teamName: $teamName } }) {
-          task {
-            id
-            name
-            project {
-              id
-              name
-            }
-          }
-        }
-      }
-    `;
-    return this.client.request(mutation, { name, projectName, teamName });
-  }
-
-  async createTaskTimeEntry(taskId: string, startTime: string, endTime: string, description?: string, billable?: boolean) {
-    const mutation = `
-      mutation CreateTaskTimeEntry($taskId: ID!, $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!, $description: String, $billable: Boolean) {
-        createTaskTimeEntry(input: { taskId: $taskId, startTime: $startTime, endTime: $endTime, description: $description, billable: $billable }) {
-          taskTimeEntry {
+  async getTimeEntries(startDate: string, endDate: string): Promise<TimeEntryRecord[]> {
+    const data = await this.request<{
+      taskTimeEntries: Array<{
+        duration: number;
+        endTime: string;
+        id: string;
+        startTime: string;
+        task?: {
+          id: string;
+          name: string;
+          project?: {
+            client?: {
+              id: string;
+              name: string;
+            } | null;
+            color?: string | null;
+            id: string;
+            name: string;
+          } | null;
+        } | null;
+      }>;
+    }>(
+      `
+        query TaskTimeEntries($startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!) {
+          taskTimeEntries(startTime: $startTime, endTime: $endTime) {
             id
             duration
             startTime
@@ -234,106 +227,297 @@ export class RizeClient {
             task {
               id
               name
+              project {
+                id
+                name
+                color
+                client {
+                  id
+                  name
+                }
+              }
             }
           }
         }
+      `,
+      {
+        endTime: `${endDate}T23:59:59Z`,
+        startTime: `${startDate}T00:00:00Z`,
       }
-    `;
-    return this.client.request(mutation, { taskId, startTime, endTime, description, billable });
+    );
+
+    return data.taskTimeEntries.map((entry) => ({
+      id: entry.id,
+      durationSeconds: entry.duration,
+      endTime: entry.endTime,
+      startTime: entry.startTime,
+      task: entry.task
+        ? {
+            id: entry.task.id,
+            name: entry.task.name,
+            project: entry.task.project
+              ? {
+                  id: entry.task.project.id,
+                  name: entry.task.project.name,
+                  color: entry.task.project.color ?? null,
+                  client: entry.task.project.client
+                    ? {
+                        id: entry.task.project.client.id,
+                        name: entry.task.project.client.name,
+                      }
+                    : undefined,
+                }
+              : undefined,
+          }
+        : undefined,
+    }));
   }
 
-  async updateTask(id: string, name?: string, projectName?: string, status?: string, teamName?: string) {
-    const mutation = `
-      mutation UpdateTask($id: ID!, $name: String, $projectName: String, $status: String, $teamName: String) {
-        updateTask(input: { args: { id: $id, name: $name, projectName: $projectName, status: $status, teamName: $teamName } }) {
-          task {
+  async getSummaries(
+    startDate: string,
+    endDate: string,
+    bucketSize: 'day' | 'month' | 'week'
+  ): Promise<SummaryBucket[]> {
+    const data = await this.request<{
+      summaries:
+        | Array<{
+            breakTime: number;
+            endTime: string;
+            focusTime: number;
+            meetingTime: number;
+            startTime: string;
+            trackedTime: number;
+            workHours: number;
+          }>
+        | {
+            breakTime: number;
+            endTime: string;
+            focusTime: number;
+            meetingTime: number;
+            startTime: string;
+            trackedTime: number;
+            workHours: number;
+          };
+    }>(
+      `
+        query Summaries($startDate: ISO8601Date!, $endDate: ISO8601Date!, $bucketSize: String!) {
+          summaries(startDate: $startDate, endDate: $endDate, bucketSize: $bucketSize) {
+            startTime
+            endTime
+            focusTime
+            meetingTime
+            breakTime
+            trackedTime
+            workHours
+          }
+        }
+      `,
+      { bucketSize, endDate, startDate }
+    );
+
+    const buckets = Array.isArray(data.summaries) ? data.summaries : [data.summaries];
+
+    return buckets.map((bucket) => ({
+      breakTimeSeconds: bucket.breakTime,
+      endTime: bucket.endTime,
+      focusTimeSeconds: bucket.focusTime,
+      meetingTimeSeconds: bucket.meetingTime,
+      startTime: bucket.startTime,
+      trackedTimeSeconds: bucket.trackedTime,
+      workHoursSeconds: bucket.workHours,
+    }));
+  }
+
+  async getCurrentSession(): Promise<SessionRecord | null> {
+    const data = await this.request<{
+      currentSession: {
+        endTime?: string | null;
+        id: string;
+        startTime: string;
+        title: string;
+        type: string;
+      } | null;
+    }>(
+      `
+        query CurrentSession {
+          currentSession {
             id
-            name
-            status
-            project {
+            title
+            startTime
+            endTime
+            type
+          }
+        }
+      `
+    );
+
+    if (!data.currentSession) {
+      return null;
+    }
+
+    return {
+      durationSeconds: calculateDurationSeconds(
+        data.currentSession.startTime,
+        data.currentSession.endTime ?? null
+      ),
+      endTime: data.currentSession.endTime ?? null,
+      id: data.currentSession.id,
+      projects: [],
+      startTime: data.currentSession.startTime,
+      tasks: [],
+      title: data.currentSession.title,
+      type: data.currentSession.type,
+    };
+  }
+
+  async getSessions(startDate: string, endDate: string): Promise<SessionRecord[]> {
+    const data = await this.request<{
+      sessions: Array<{
+        description?: string | null;
+        endTime?: string | null;
+        id: string;
+        projects?: Array<{
+          client?: {
+            id: string;
+            name: string;
+          } | null;
+          color?: string | null;
+          id: string;
+          name: string;
+        }> | null;
+        source?: string | null;
+        startTime: string;
+        tasks?: Array<{
+          id: string;
+          name: string;
+        }> | null;
+        title: string;
+        type: string;
+      }>;
+    }>(
+      `
+        query Sessions($startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!) {
+          sessions(startTime: $startTime, endTime: $endTime) {
+            id
+            title
+            description
+            startTime
+            endTime
+            type
+            source
+            projects {
+              id
+              name
+              color
+              client {
+                id
+                name
+              }
+            }
+            tasks {
               id
               name
             }
           }
         }
+      `,
+      {
+        endTime: `${endDate}T23:59:59Z`,
+        startTime: `${startDate}T00:00:00Z`,
       }
-    `;
-    return this.client.request(mutation, { id, name, projectName, status, teamName });
-  }
+    );
 
-  async updateProject(id: string, name?: string, clientName?: string, status?: string, teamName?: string) {
-    const mutation = `
-      mutation UpdateProject($id: ID!, $name: String, $clientName: String, $status: String, $teamName: String) {
-        updateProject(input: { args: { id: $id, name: $name, clientName: $clientName, status: $status, teamName: $teamName } }) {
-          project {
-            id
-            name
-            status
-            client {
-              id
-              name
+    return data.sessions.map((session) => ({
+      description: session.description ?? null,
+      durationSeconds: calculateDurationSeconds(session.startTime, session.endTime ?? null),
+      endTime: session.endTime ?? null,
+      id: session.id,
+      projects: (session.projects ?? []).map((project) => ({
+        id: project.id,
+        name: project.name,
+        color: project.color ?? null,
+        client: project.client
+          ? {
+              id: project.client.id,
+              name: project.client.name,
             }
-          }
-        }
-      }
-    `;
-    return this.client.request(mutation, { id, name, clientName, status, teamName });
+          : undefined,
+      })),
+      source: session.source ?? null,
+      startTime: session.startTime,
+      tasks: (session.tasks ?? []).map((task) => ({
+        id: task.id,
+        name: task.name,
+      })),
+      title: session.title,
+      type: session.type,
+    }));
   }
 
-  async updateClient(id: string, name?: string, status?: string, teamName?: string) {
-    const mutation = `
-      mutation UpdateClient($id: ID!, $name: String, $status: String, $teamName: String) {
-        updateClient(input: { args: { id: $id, name: $name, status: $status, teamName: $teamName } }) {
-          client {
-            id
-            name
-            status
-          }
+  private async request<TData>(
+    query: string,
+    variables?: Record<string, unknown>
+  ): Promise<TData> {
+    const response = await this.fetchFn(RIZE_API_URL, {
+      body: JSON.stringify({
+        query,
+        variables,
+      }),
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    });
+
+    const payload = (await response.json()) as GraphQLResponse<TData>;
+
+    if (!response.ok) {
+      throw new AppError('UPSTREAM_ERROR', 'Rize API request failed', {
+        details: {
+          body: payload,
+          status: response.status,
+        },
+        status: 502,
+      });
+    }
+
+    if (payload.errors?.length) {
+      throw new AppError(
+        'UPSTREAM_ERROR',
+        payload.errors.map((error) => error.message).join('; '),
+        {
+          details: payload.errors,
+          status: 502,
         }
-      }
-    `;
-    return this.client.request(mutation, { id, name, status, teamName });
+      );
+    }
+
+    if (!payload.data) {
+      throw new AppError('UPSTREAM_ERROR', 'Rize API returned no data', {
+        details: payload,
+        status: 502,
+      });
+    }
+
+    return payload.data;
+  }
+}
+
+function calculateDurationSeconds(
+  startTime: string,
+  endTime?: string | null
+): number | null {
+  if (!endTime) {
+    return null;
   }
 
-  async deleteTask(id: string) {
-    const mutation = `
-      mutation DeleteTask($id: ID!) {
-        deleteTask(input: { id: $id }) {
-          task {
-            id
-            name
-          }
-        }
-      }
-    `;
-    return this.client.request(mutation, { id });
+  const start = Date.parse(startTime);
+  const end = Date.parse(endTime);
+
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    return null;
   }
 
-  async deleteProject(id: string) {
-    const mutation = `
-      mutation DeleteProject($id: ID!) {
-        deleteProject(input: { id: $id }) {
-          project {
-            id
-            name
-          }
-        }
-      }
-    `;
-    return this.client.request(mutation, { id });
-  }
-
-  async deleteClient(id: string) {
-    const mutation = `
-      mutation DeleteClient($id: ID!) {
-        deleteClient(input: { id: $id }) {
-          client {
-            id
-            name
-          }
-        }
-      }
-    `;
-    return this.client.request(mutation, { id });
-  }
+  return Math.max(0, Math.round((end - start) / 1000));
 }

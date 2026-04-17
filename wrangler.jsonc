@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rize-team-analytics-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-16",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "MCP_ROUTE": "/mcp",
+    "HEALTH_ROUTE": "/health"
+  }
+}

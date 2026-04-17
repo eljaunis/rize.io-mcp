@@ -1,15 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["@cloudflare/workers-types", "node"],
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "declaration": true
+    "noEmit": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*", "vitest.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

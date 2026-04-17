@@ -1,100 +1,162 @@
-# Rize MCP Server
+# Rize Team Analytics MCP
 
-MCP (Model Context Protocol) server for [Rize.io](https://rize.io) time tracking integration. Works with Windsurf, Claude Desktop, and other MCP-compatible clients.
+Read-only MCP server for [Rize.io](https://rize.io), built for team analytics and Claude-led analysis prompts. It runs as a hosted remote MCP on Cloudflare Workers and exposes a Streamable HTTP endpoint at `/mcp`.
 
-## Setup
+## What Changed
 
-1. Clone this repo
-2. Get your Rize API key from **Settings > API** in the Rize app
-3. Install and build:
+- Remote hosted MCP instead of a local stdio server
+- Read-only tools only
+- One analysis-first tool for Claude: `rize_analysis_context_get`
+- Shared-key endpoint auth for the first version
+- Zod-backed tool schemas, standardized tool envelopes, and automated tests
+
+## Tool Surface
+
+| Tool | Purpose |
+|------|---------|
+| `rize_user_get` | Get the authenticated Rize user |
+| `rize_clients_list` | List clients |
+| `rize_projects_list` | List projects, optionally filtered by client IDs |
+| `rize_tasks_list` | List tasks, optionally filtered by project IDs |
+| `rize_time_entries_list` | List approved task time entries for a date range |
+| `rize_summaries_get` | Get workspace-level focus/meeting/break/tracked/work-hour summaries |
+| `rize_sessions_current_get` | Get the current active session |
+| `rize_sessions_list` | List sessions for a date range |
+| `rize_analysis_context_get` | Return structured Rize context for Claude to analyze |
+
+All tool responses use the same envelope:
+
+```json
+{
+  "ok": true,
+  "data": {}
+}
+```
+
+Failures return:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "AUTH_ERROR",
+    "message": "Unauthorized request"
+  }
+}
+```
+
+## Local Setup
+
+1. Install dependencies:
+
    ```bash
    npm install
-   npm run build
    ```
 
-## Available Tools
+2. Add secrets in Cloudflare for deployment:
 
-### Read Operations
-| Tool | Description |
-|------|-------------|
-| `rize_get_current_user` | Get current authenticated user info |
-| `rize_list_clients` | List all clients (with team info) |
-| `rize_list_projects` | List all projects (with client info) |
-| `rize_list_tasks` | List all tasks (with project info) |
-| `rize_get_time_entries` | Get time entries for a date range |
-| `rize_get_summaries` | Get time summaries (focus, meeting, break time) |
-| `rize_get_current_session` | Get the current active session |
-| `rize_get_sessions` | Get all sessions for a date range |
+   ```bash
+   npx wrangler secret put RIZE_API_KEY
+   npx wrangler secret put MCP_SHARED_API_KEY
+   ```
 
-### Create Operations
-| Tool | Description |
-|------|-------------|
-| `rize_create_client` | Create a new client |
-| `rize_create_project` | Create a new project (optionally linked to client) |
-| `rize_create_task` | Create a new task (optionally linked to project) |
-| `rize_create_task_time_entry` | Log time to a task |
+3. Optional local vars can come from `.dev.vars`:
 
-### Update Operations
-| Tool | Description |
-|------|-------------|
-| `rize_update_client` | Update client (rename, set status) |
-| `rize_update_project` | Update project (rename, change client, set status) |
-| `rize_update_task` | Update task (rename, change project, set status) |
+   ```env
+   ALLOWED_ORIGINS=https://claude.ai,https://www.claude.ai
+   MCP_ROUTE=/mcp
+   HEALTH_ROUTE=/health
+   ```
 
-### Delete Operations
-| Tool | Description |
-|------|-------------|
-| `rize_delete_client` | Delete a client by ID |
-| `rize_delete_project` | Delete a project by ID |
-| `rize_delete_task` | Delete a task by ID |
+4. Verify the project:
 
-**Note:** Create/update operations require a `teamName` parameter to specify which team to operate under.
+   ```bash
+   npm run check
+   ```
 
-## AI Agent Skill
+## Run And Deploy
 
-This repo includes a Claude-compatible Agent Skill for AI assistants. The skill teaches agents how to effectively use the Rize MCP for time tracking workflows.
+Local dev server:
 
-**Location:** `skills/tracking-time-with-rize/`
+```bash
+npm run dev
+```
 
-To use with Claude or other compatible AI agents, copy the skill directory to your agent's skills folder.
+Deploy to Cloudflare Workers:
 
-## MCP Configuration
+```bash
+npm run deploy
+```
 
-### Windsurf
+After deploy, the MCP endpoint will be:
 
-Add to your `mcp_config.json`:
+```text
+https://<worker>.<account>.workers.dev/mcp
+```
+
+Health endpoint:
+
+```text
+https://<worker>.<account>.workers.dev/health
+```
+
+## Authentication
+
+This version uses a shared team key at the MCP edge:
+
+- `Authorization: Bearer <MCP_SHARED_API_KEY>`
+- or `x-mcp-api-key: <MCP_SHARED_API_KEY>`
+
+The Worker also validates the `Origin` header when it is present.
+
+## Team Analysis Workflow
+
+Use `rize_analysis_context_get` when Claude should answer a natural-language question such as:
+
+- "Analyze how the team split time between clients last week."
+- "Compare focus time and meeting load for April 14 through April 15."
+- "Which projects consumed the most tracked time this sprint?"
+
+Recommended input:
 
 ```json
 {
-  "mcpServers": {
-    "rize": {
-      "command": "node",
-      "args": ["/path/to/rize-mcp/dist/index.js"],
-      "env": {
-        "RIZE_API_KEY": "your_api_key_here"
-      }
-    }
-  }
+  "prompt": "Analyze focus trends and client allocation",
+  "startDate": "2026-04-01",
+  "endDate": "2026-04-15",
+  "clientIds": ["client-1"]
 }
 ```
 
-### Claude Desktop
+The tool returns:
 
-Add to your Claude Desktop config:
+- normalized scope and inferred topics
+- summary buckets
+- filtered time entries and sessions
+- compact aggregates by client, project, task, day, and session type
+- warnings when the prompt asks for unavailable data
 
-```json
-{
-  "mcpServers": {
-    "rize": {
-      "command": "node",
-      "args": ["/path/to/rize-mcp/dist/index.js"],
-      "env": {
-        "RIZE_API_KEY": "your_api_key_here"
-      }
-    }
-  }
-}
+Claude is expected to do the narrative reasoning in-chat. The MCP only returns structured context.
+
+## Testing
+
+```bash
+npm run build
+npm test
+npm run check
 ```
+
+The test suite covers:
+
+- schema validation
+- Rize query shaping and error mapping
+- analysis aggregation
+- auth behavior
+- remote MCP tool listing and tool execution through the SDK client
+
+## Skill
+
+This repo includes a compatible skill at `skills/tracking-time-with-rize/` for agents that should use the hosted MCP as an analytics source rather than a CRUD integration.
 
 ## License
 
