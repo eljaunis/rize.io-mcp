@@ -2,8 +2,18 @@ export interface CloudflareEnv {
   ALLOWED_ORIGINS?: string;
   HEALTH_ROUTE?: string;
   MCP_ROUTE?: string;
-  MCP_SHARED_API_KEY?: string;
+  MCP_AUTH_USERS_JSON?: string;
+  OAUTH_CLIENT_REGISTRATION_ROUTE?: string;
+  OAUTH_AUTHORIZE_ROUTE?: string;
+  OAUTH_KV: KVNamespace;
+  OAUTH_PROVIDER?: {
+    completeAuthorization: (options: unknown) => Promise<{ redirectTo: string }>;
+    lookupClient: (clientId: string) => Promise<unknown>;
+    parseAuthRequest: (request: Request) => Promise<unknown>;
+  };
   RIZE_API_KEY?: string;
+  SESSION_SIGNING_SECRET?: string;
+  TOKEN_ROUTE?: string;
 }
 
 export type ErrorCode =

@@ -243,8 +243,4 @@ export function assertRequiredEnv(env: CloudflareEnv): void {
   if (!env.RIZE_API_KEY) {
     throw new AppError('CONFIG_ERROR', 'RIZE_API_KEY is required', { status: 500 });
   }
-
-  if (!env.MCP_SHARED_API_KEY) {
-    throw new AppError('CONFIG_ERROR', 'MCP_SHARED_API_KEY is required', { status: 500 });
-  }
 }

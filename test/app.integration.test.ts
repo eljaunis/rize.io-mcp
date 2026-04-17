@@ -15,35 +15,13 @@ afterEach(async () => {
 });
 
 describe('remote MCP integration', () => {
-  it('rejects unauthorized requests before MCP handling', async () => {
-    const { close, url } = await startTestServer(TEST_ENV, {
-      fetchFn: createMockRizeFetch(),
-    });
-    openServers.push(close);
-
-    const response = await fetch(url, {
-      headers: {
-        accept: 'application/json, text/event-stream',
-      },
-      method: 'POST',
-    });
-
-    expect(response.status).toBe(401);
-  });
-
   it('lists only the read-only tools through the MCP client', async () => {
     const { close, url } = await startTestServer(TEST_ENV, {
       fetchFn: createMockRizeFetch(),
     });
     openServers.push(close);
 
-    const transport = new StreamableHTTPClientTransport(url, {
-      requestInit: {
-        headers: {
-          authorization: `Bearer ${TEST_ENV.MCP_SHARED_API_KEY}`,
-        },
-      },
-    });
+    const transport = new StreamableHTTPClientTransport(url);
     const client = new Client({ name: 'test-client', version: '1.0.0' });
 
     await client.connect(transport);
@@ -71,13 +49,7 @@ describe('remote MCP integration', () => {
     });
     openServers.push(close);
 
-    const transport = new StreamableHTTPClientTransport(url, {
-      requestInit: {
-        headers: {
-          authorization: `Bearer ${TEST_ENV.MCP_SHARED_API_KEY}`,
-        },
-      },
-    });
+    const transport = new StreamableHTTPClientTransport(url);
     const client = new Client({ name: 'test-client', version: '1.0.0' });
 
     await client.connect(transport);
@@ -119,13 +91,7 @@ describe('remote MCP integration', () => {
     });
     openServers.push(close);
 
-    const transport = new StreamableHTTPClientTransport(url, {
-      requestInit: {
-        headers: {
-          authorization: `Bearer ${TEST_ENV.MCP_SHARED_API_KEY}`,
-        },
-      },
-    });
+    const transport = new StreamableHTTPClientTransport(url);
     const client = new Client({ name: 'test-client', version: '1.0.0' });
 
     await client.connect(transport);

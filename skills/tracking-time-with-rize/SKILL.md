@@ -19,6 +19,7 @@ This skill teaches an agent how to use the hosted Rize MCP as a question-first r
 Server name: `rize`
 
 This skill assumes a hosted remote MCP endpoint, not a local stdio server.
+It also assumes the remote endpoint uses Claude-compatible OAuth rather than a static shared API key.
 
 ## Available Tools
 

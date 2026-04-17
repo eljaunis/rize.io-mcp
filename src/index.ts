@@ -1,152 +1,74 @@
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { isAppError, toFailureEnvelope, AppError } from './errors.js';
-import { RizeClient } from './rize-client.js';
-import { createRizeMcpServer, assertRequiredEnv } from './tools.js';
+import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
+import { AppError } from './errors.js';
+import {
+  handleAuthorizeSubmission,
+  parseAuthUsers,
+  renderAuthorizePage,
+} from './auth.js';
+import { createApp } from './mcp-app.js';
 import type { AppDependencies, CloudflareEnv } from './types.js';
+const DEFAULT_AUTHORIZE_ROUTE = '/authorize';
+const DEFAULT_TOKEN_ROUTE = '/token';
+const DEFAULT_CLIENT_REGISTRATION_ROUTE = '/register';
 
-const DEFAULT_ALLOWED_ORIGINS = [
-  'https://claude.ai',
-  'https://www.claude.ai',
-  'https://claude.com',
-  'https://www.claude.com',
-];
+const authHandler = {
+  async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    const authorizeRoute = env.OAUTH_AUTHORIZE_ROUTE ?? DEFAULT_AUTHORIZE_ROUTE;
+    const healthRoute = env.HEALTH_ROUTE ?? '/health';
 
-const DEFAULT_HEALTH_ROUTE = '/health';
-const DEFAULT_MCP_ROUTE = '/mcp';
+    if (url.pathname === healthRoute) {
+      return createApp(env).fetch(request, ctx);
+    }
 
-export function createApp(env: CloudflareEnv, deps: AppDependencies = {}) {
-  const healthRoute = env.HEALTH_ROUTE ?? DEFAULT_HEALTH_ROUTE;
-  const mcpRoute = env.MCP_ROUTE ?? DEFAULT_MCP_ROUTE;
-  const fetchFn = deps.fetchFn ?? fetch;
+    if (url.pathname === authorizeRoute && request.method === 'GET') {
+      assertOAuthConfig(env);
+      return renderAuthorizePage(request, env);
+    }
 
-  return {
-    async fetch(request: Request, _ctx: ExecutionContext): Promise<Response> {
-      const url = new URL(request.url);
+    if (url.pathname === authorizeRoute && request.method === 'POST') {
+      assertOAuthConfig(env);
+      return handleAuthorizeSubmission(request, env);
+    }
 
-      if (url.pathname === healthRoute) {
-        return Response.json({
-          ok: true,
-          route: mcpRoute,
-          service: 'rize-team-analytics-mcp',
-        });
-      }
+    return new Response('Not found', { status: 404 });
+  },
+};
 
-      if (url.pathname !== mcpRoute) {
-        return Response.json(
-          {
-            ok: false,
-            error: {
-              code: 'INTERNAL_ERROR',
-              message: `Unknown route: ${url.pathname}`,
-            },
-          },
-          { status: 404 }
-        );
-      }
-
-      try {
-        assertRequiredEnv(env);
-        validateOrigin(request, env);
-        validateAuthorization(request, env);
-
-        console.log(
-          JSON.stringify({
-            event: 'mcp_request',
-            hasOrigin: Boolean(request.headers.get('origin')),
-            method: request.method,
-            path: url.pathname,
-          })
-        );
-
-        const client = new RizeClient({
-          apiKey: env.RIZE_API_KEY!,
-          fetchFn,
-        });
-        const server = createRizeMcpServer(env, client);
-        const transport = new WebStandardStreamableHTTPServerTransport({
-          enableJsonResponse: true,
-        });
-        await server.connect(transport);
-
-        return await transport.handleRequest(request);
-      } catch (error) {
-        const failure = toFailureEnvelope(error);
-        const status = isAppError(error) ? error.status : 500;
-
-        console.error(
-          JSON.stringify({
-            error: failure.error,
-            event: 'mcp_request_failed',
-            method: request.method,
-            path: url.pathname,
-          })
-        );
-
-        return Response.json(failure, { status });
-      }
+export function createOAuthProtectedHandler(
+  env: CloudflareEnv,
+  deps: AppDependencies = {}
+) {
+  return new OAuthProvider<CloudflareEnv>({
+    accessTokenTTL: 60 * 60,
+    allowPlainPKCE: false,
+    apiHandler: {
+      async fetch(request: Request, _env: CloudflareEnv, ctx: ExecutionContext) {
+        return createApp(env, deps).fetch(request, ctx);
+      },
     },
-  };
+    apiRoute: env.MCP_ROUTE ?? '/mcp',
+    authorizeEndpoint: env.OAUTH_AUTHORIZE_ROUTE ?? DEFAULT_AUTHORIZE_ROUTE,
+    clientRegistrationEndpoint:
+      env.OAUTH_CLIENT_REGISTRATION_ROUTE ?? DEFAULT_CLIENT_REGISTRATION_ROUTE,
+    defaultHandler: authHandler,
+    refreshTokenTTL: 60 * 60 * 24 * 30,
+    scopesSupported: ['reports:read'],
+    tokenEndpoint: env.TOKEN_ROUTE ?? DEFAULT_TOKEN_ROUTE,
+  });
 }
 
-export function getAllowedOrigins(env: CloudflareEnv): string[] {
-  const configured = (env.ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  return [...new Set([...DEFAULT_ALLOWED_ORIGINS, ...configured])];
-}
-
-export function validateOrigin(request: Request, env: CloudflareEnv): void {
-  const origin = request.headers.get('origin');
-
-  if (!origin) {
-    return;
-  }
-
-  if (!getAllowedOrigins(env).includes(origin)) {
-    throw new AppError('AUTH_ERROR', `Origin not allowed: ${origin}`, {
-      status: 403,
+function assertOAuthConfig(env: CloudflareEnv): void {
+  parseAuthUsers(env);
+  if (!env.SESSION_SIGNING_SECRET) {
+    throw new AppError('CONFIG_ERROR', 'SESSION_SIGNING_SECRET is required', {
+      status: 500,
     });
   }
 }
 
-export function validateAuthorization(request: Request, env: CloudflareEnv): void {
-  const expected = env.MCP_SHARED_API_KEY;
-  const provided = extractApiKey(request);
-
-  if (!expected) {
-    throw new AppError('CONFIG_ERROR', 'MCP_SHARED_API_KEY is required', { status: 500 });
-  }
-
-  if (provided !== expected) {
-    throw new AppError('AUTH_ERROR', 'Unauthorized request', { status: 401 });
-  }
-}
-
-function extractApiKey(request: Request): string | null {
-  const headerKey = request.headers.get('x-mcp-api-key');
-
-  if (headerKey) {
-    return headerKey;
-  }
-
-  const authorization = request.headers.get('authorization');
-
-  if (!authorization) {
-    return null;
-  }
-
-  const [scheme, token] = authorization.split(/\s+/, 2);
-  if (scheme?.toLowerCase() !== 'bearer' || !token) {
-    return null;
-  }
-
-  return token;
-}
-
 export default {
   fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
-    return createApp(env).fetch(request, ctx);
+    return createOAuthProtectedHandler(env).fetch(request, env, ctx);
   },
 };

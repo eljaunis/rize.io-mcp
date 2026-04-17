@@ -1,12 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createApp } from '../src/index.js';
+import { createApp } from '../src/mcp-app.js';
 import type { AppDependencies, CloudflareEnv } from '../src/types.js';
 
 export const TEST_ENV: CloudflareEnv = {
   ALLOWED_ORIGINS: 'https://claude.ai',
   MCP_ROUTE: '/mcp',
-  MCP_SHARED_API_KEY: 'test-shared-key',
+  MCP_AUTH_USERS_JSON:
+    '[{"username":"juan","password":"secret-pass","displayName":"Juan"}]',
+  OAUTH_KV: {} as KVNamespace,
+  SESSION_SIGNING_SECRET: 'test-session-signing-secret',
   RIZE_API_KEY: 'test-rize-key',
 };
 
