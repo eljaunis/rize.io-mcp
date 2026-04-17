@@ -6,6 +6,15 @@
   "observability": {
     "enabled": true
   },
+  // @cloudflare/workers-oauth-provider requires a KV namespace bound as OAUTH_KV.
+  // Namespace: rize-oauth-kv
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "644a1fdb49214995b329caabbef3036b",
+      "preview_id": "644a1fdb49214995b329caabbef3036b"
+    }
+  ],
   "vars": {
     "OAUTH_AUTHORIZE_ROUTE": "/authorize",
     "OAUTH_CLIENT_REGISTRATION_ROUTE": "/register",
