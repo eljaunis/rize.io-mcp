@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "rize-team-analytics-mcp",
+  "name": "rize-io-mcp",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-16",
   "observability": {
