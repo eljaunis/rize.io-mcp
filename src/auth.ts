@@ -16,7 +16,7 @@ export interface ParsedSession {
 const DEFAULT_CLIENT_NAME = 'Rize Team Analytics';
 const DEFAULT_SCOPE = 'reports:read';
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 8;
-const CSRF_COOKIE_NAME = '__Host-rize-csrf';
+const CSRF_TOKEN_MAX_AGE_SECONDS = 60 * 10;
 const SESSION_COOKIE_NAME = '__Host-rize-session';
 
 export async function renderAuthorizePage(
@@ -26,7 +26,7 @@ export async function renderAuthorizePage(
   const oauth = getOAuthHelpers(env);
   const authRequest = await oauth.parseAuthRequest(request);
   const client = (await oauth.lookupClient(authRequest.clientId)) as ClientInfo | null;
-  const csrfToken = crypto.randomUUID();
+  const csrfToken = await createCsrfToken(env);
   const session = await readSession(request, env);
   const grantedScopes = authRequest.scope.length > 0 ? authRequest.scope : [DEFAULT_SCOPE];
   const title = session
@@ -87,7 +87,6 @@ export async function renderAuthorizePage(
         'Content-Security-Policy':
           "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'",
         'Content-Type': 'text/html; charset=utf-8',
-        'Set-Cookie': createCsrfCookie(csrfToken),
       },
     }
   );
@@ -101,7 +100,7 @@ export async function handleAuthorizeSubmission(
   const authRequest = await oauth.parseAuthRequest(request);
   const formData = await request.formData();
 
-  validateCsrfToken(formData.get('csrf_token'), request);
+  await validateCsrfToken(formData.get('csrf_token'), env);
 
   const existingSession = await readSession(request, env);
   const user =
@@ -130,7 +129,6 @@ export async function handleAuthorizeSubmission(
   });
 
   const headers = new Headers({ Location: redirectTo });
-  headers.append('Set-Cookie', clearCookie(CSRF_COOKIE_NAME));
   if (!existingSession) {
     const sessionToken = await createSessionToken(
       {
@@ -259,22 +257,46 @@ function getOAuthHelpers(env: CloudflareEnv): OAuthHelpers {
   return env.OAUTH_PROVIDER as unknown as OAuthHelpers;
 }
 
-function validateCsrfToken(formToken: FormDataEntryValue | null, request: Request) {
-  const csrfCookie = getCookie(request, CSRF_COOKIE_NAME);
-  if (!formToken || typeof formToken !== 'string' || !csrfCookie || formToken !== csrfCookie) {
-    throw new AppError('AUTH_ERROR', 'Invalid authorization form state', { status: 400 });
-  }
+async function createCsrfToken(env: CloudflareEnv): Promise<string> {
+  const secret = await getSessionSecretKey(env);
+  const nonce = crypto.randomUUID();
+  const expiresAt = Math.floor(Date.now() / 1000) + CSRF_TOKEN_MAX_AGE_SECONDS;
+  const payload = `${nonce}|${expiresAt}`;
+  const signature = await signValue(payload, secret);
+  return `${toBase64Url(payload)}.${signature}`;
 }
 
-function createCsrfCookie(token: string): string {
-  return [
-    `${CSRF_COOKIE_NAME}=${token}`,
-    'HttpOnly',
-    'Path=/',
-    'SameSite=Lax',
-    'Secure',
-    'Max-Age=600',
-  ].join('; ');
+async function validateCsrfToken(
+  formToken: FormDataEntryValue | null,
+  env: CloudflareEnv
+): Promise<void> {
+  if (!formToken || typeof formToken !== 'string') {
+    throw new AppError('AUTH_ERROR', 'Invalid authorization form state', { status: 400 });
+  }
+
+  const [encodedPayload, signature] = formToken.split('.', 2);
+  if (!encodedPayload || !signature) {
+    throw new AppError('AUTH_ERROR', 'Invalid authorization form state', { status: 400 });
+  }
+
+  let payload: string;
+  try {
+    payload = fromBase64Url(encodedPayload);
+  } catch {
+    throw new AppError('AUTH_ERROR', 'Invalid authorization form state', { status: 400 });
+  }
+
+  const secret = await getSessionSecretKey(env);
+  const expected = await signValue(payload, secret);
+  if (expected !== signature) {
+    throw new AppError('AUTH_ERROR', 'Invalid authorization form state', { status: 400 });
+  }
+
+  const [, expiresAtRaw] = payload.split('|');
+  const expiresAt = Number(expiresAtRaw);
+  if (!expiresAtRaw || Number.isNaN(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
+    throw new AppError('AUTH_ERROR', 'Authorization form expired, please retry', { status: 400 });
+  }
 }
 
 function createSessionCookie(token: string): string {
@@ -286,10 +308,6 @@ function createSessionCookie(token: string): string {
     'Secure',
     `Max-Age=${COOKIE_MAX_AGE_SECONDS}`,
   ].join('; ');
-}
-
-function clearCookie(name: string): string {
-  return `${name}=; HttpOnly; Path=/; SameSite=Lax; Secure; Max-Age=0`;
 }
 
 function getCookie(request: Request, name: string): string | null {

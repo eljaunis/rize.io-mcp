@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm view *)",
+      "Bash(npx wrangler *)",
+      "Bash(timeout 150 npx wrangler tail rize-io-mcp --format=pretty)",
+      "Bash(echo \"tail pid: $!\")",
+      "Read(//tmp/**)",
+      "Bash(wait 1870)",
+      "Bash(curl -sS -i \"https://rize-io-mcp.juan-72b.workers.dev/authorize?response_type=code&client_id=lOoHQ1B1H4tBCz_A&code_challenge=S0u51CadNYMgTyxoL63f6PZ4El3PCpoi83q296i8gXs&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A45842%2Fcallback&state=QPScxjQzo6aqkd4eZPH6BRPPOMh7hRg7AagVlfjItgw&scope=reports%3Aread&resource=https%3A%2F%2Frize-io-mcp.juan-72b.workers.dev%2Fmcp\")",
+      "Bash(curl -sS -i -H \"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\" -H \"Accept-Language: en-US,en;q=0.5\" -H \"User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/128.0\" \"https://rize-io-mcp.juan-72b.workers.dev/authorize?response_type=code&client_id=lOoHQ1B1H4tBCz_A&code_challenge=S0u51CadNYMgTyxoL63f6PZ4El3PCpoi83q296i8gXs&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A45842%2Fcallback&state=QPScxjQzo6aqkd4eZPH6BRPPOMh7hRg7AagVlfjItgw&scope=reports%3Aread&resource=https%3A%2F%2Frize-io-mcp.juan-72b.workers.dev%2Fmcp\")",
+      "Bash(wait 1895)"
+    ]
+  }
+}
