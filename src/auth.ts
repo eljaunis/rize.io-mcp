@@ -85,7 +85,7 @@ export async function renderAuthorizePage(
     {
       headers: {
         'Content-Security-Policy':
-          "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+          "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'",
         'Content-Type': 'text/html; charset=utf-8',
       },
     }
