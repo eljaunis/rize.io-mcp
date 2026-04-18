@@ -31,7 +31,7 @@ export class RizeClient {
 
   constructor(options: RizeClientOptions) {
     this.apiKey = options.apiKey;
-    this.fetchFn = options.fetchFn ?? fetch;
+    this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
   }
 
   async getCurrentUser(): Promise<CurrentUser> {
