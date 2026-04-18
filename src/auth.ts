@@ -129,8 +129,8 @@ export async function handleAuthorizeSubmission(
     userId: user.username,
   });
 
-  const response = Response.redirect(redirectTo, 302);
-  response.headers.append('Set-Cookie', clearCookie(CSRF_COOKIE_NAME));
+  const headers = new Headers({ Location: redirectTo });
+  headers.append('Set-Cookie', clearCookie(CSRF_COOKIE_NAME));
   if (!existingSession) {
     const sessionToken = await createSessionToken(
       {
@@ -139,10 +139,10 @@ export async function handleAuthorizeSubmission(
       },
       env
     );
-    response.headers.append('Set-Cookie', createSessionCookie(sessionToken));
+    headers.append('Set-Cookie', createSessionCookie(sessionToken));
   }
 
-  return response;
+  return new Response(null, { headers, status: 302 });
 }
 
 export function authenticateUser(
